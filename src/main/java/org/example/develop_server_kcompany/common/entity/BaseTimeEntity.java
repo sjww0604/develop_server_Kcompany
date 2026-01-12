@@ -1,4 +1,4 @@
-package common.entity;
+package org.example.develop_server_kcompany.common.entity;
 
 import java.time.LocalDateTime;
 

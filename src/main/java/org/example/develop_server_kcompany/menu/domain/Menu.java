@@ -1,12 +1,12 @@
-package common.entity;
+package org.example.develop_server_kcompany.menu.domain;
 
+import org.example.develop_server_kcompany.common.entity.BaseTimeEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -37,7 +37,7 @@ public class Menu extends BaseTimeEntity {
 	@Column(nullable = false)
 	private Integer price;
 
-	@Column(nullable = false)
-	private boolean is_active = true;
+	@Column(nullable = false, name = "is_active")
+	private boolean isActive = true;
 
 }
