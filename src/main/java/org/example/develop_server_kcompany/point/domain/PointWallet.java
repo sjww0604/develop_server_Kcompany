@@ -30,16 +30,18 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class PointWallet extends BaseTimeEntity {
 
+	private static final long MAX_BALANCE = 100_000_000L;
+
 	@Id
 	@Column(name = "user_id", nullable = false)
 	private Long userId;
 
 	@Column(nullable = false)
-	private Long balance = 0L;
+	private Long balance;
 
 	@Version
 	@Column(nullable = false)
-	private Integer version = 0;
+	private Long version;
 
 	public PointWallet(Long userId) {
 		this.userId = userId;
@@ -48,6 +50,7 @@ public class PointWallet extends BaseTimeEntity {
 
 	/**
 	 * 포인트를 충전합니다.
+	 *
 	 * @param amount 충전 금액(양수)
 	 * @return 충전 이후 잔액(balanceAfter)
 	 */
@@ -61,6 +64,7 @@ public class PointWallet extends BaseTimeEntity {
 
 	/**
 	 * 포인트를 사용(차감)합니다.
+	 *
 	 * @param amount 사용 금액(양수)
 	 * @return 사용 이후 잔액(balanceAfter)
 	 */
@@ -75,6 +79,15 @@ public class PointWallet extends BaseTimeEntity {
 		return this.balance;
 	}
 
-
-
+	/**
+	 * 충전 후 잔액이 최대치를 초과하지 않는지 검증합니다.
+	 *
+	 * @param amount 충전할 금액
+	 * @throws CustomException 충전 후 잔액이 최대치를 초과하는 경우
+	 */
+	private void validateBalanceOverflow(long amount) {
+		if (this.balance > MAX_BALANCE - amount) {
+			throw new CustomException(ErrorCode.BALANCE_OVERFLOW);
+		}
+	}
 }
