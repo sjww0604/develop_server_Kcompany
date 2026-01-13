@@ -18,6 +18,7 @@ import jakarta.persistence.Index;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import jakarta.validation.constraints.Positive;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -75,7 +76,7 @@ public class Order extends BaseTimeEntity {
 	private List<OrderItem> items = new ArrayList<>();
 
 	/**
-	 * 주문을 생성합니다.
+	 * 주문을 생성하는 정적 팩토리 메서드입니다.
 	 *
 	 * <p>
 	 * 주문은 생성 시 {@link OrderStatus#CREATED} 상태로 초기화되며,
@@ -84,8 +85,20 @@ public class Order extends BaseTimeEntity {
 	 *
 	 * @param userId 주문을 생성한 사용자 식별자
 	 * @param idempotencyKey 중복 주문 방지를 위한 멱등성 키
+	 * @return 생성된 주문 엔티티
 	 */
-	public Order(Long userId, String idempotencyKey) {
+	public static Order create(Long userId, String idempotencyKey) {
+		return new Order(userId, idempotencyKey);
+	}
+
+	/**
+	 * 주문을 생성합니다.
+	 *
+	 * <p>
+	 * 생성 규칙을 강제하기 위해 외부에서는 {@link #create(Long, String)}를 사용합니다.
+	 * </p>
+	 */
+	private Order(Long userId, String idempotencyKey) {
 		this.userId = userId;
 		this.idempotencyKey = idempotencyKey;
 		this.status = OrderStatus.CREATED;
@@ -103,6 +116,9 @@ public class Order extends BaseTimeEntity {
 	 * @param item 추가할 주문 항목
 	 */
 	public void addItem(OrderItem item) {
+		if (this.status != OrderStatus.CREATED) {
+			throw new IllegalStateException("주문 항목은 CREATED 상태에서만 추가할 수 있습니다.");
+		}
 		this.items.add(item);
 		item.attach(this);
 		this.totalAmount = Math.addExact(this.totalAmount, item.getLineAmount());
@@ -117,7 +133,9 @@ public class Order extends BaseTimeEntity {
 	 * </p>
 	 */
 	public void markPaid() {
+		if (this.status != OrderStatus.CREATED) {
+			throw new IllegalStateException("결제 완료 처리는 CREATED 상태에서만 가능합니다.");
+		}
 		this.status = OrderStatus.PAID;
 	}
 }
-

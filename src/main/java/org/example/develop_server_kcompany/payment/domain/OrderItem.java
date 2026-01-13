@@ -15,7 +15,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 /**
- * 주문 목록 엔티티입니다.
+ * 주문 항목 엔티티입니다.
  * <p>
  * 주문 항목은 하나의 주문({@link Order})에 소속되며,
  * 특정 메뉴에 대한 주문 수량과 금액 정보를 관리합니다.
@@ -60,7 +60,7 @@ public class OrderItem {
 	private Long lineAmount;
 
 	/**
-	 * 주문 항목을 생성합니다.
+	 * 주문 항목을 생성하는 정적 팩토리 메서드입니다.
 	 *
 	 * <p>
 	 * 메뉴 단가와 수량을 기반으로 라인 금액(lineAmount)을 계산하여 저장합니다.
@@ -70,8 +70,20 @@ public class OrderItem {
 	 * @param menuNameSnapshot 주문 시점의 메뉴 이름
 	 * @param unitPriceSnapshot 주문 시점의 메뉴 단가
 	 * @param quantity 주문 수량
+	 * @return 생성된 주문 항목 엔티티
 	 */
-	public OrderItem(Long menuId, String menuNameSnapshot, Long unitPriceSnapshot, int quantity) {
+	public static OrderItem create(Long menuId, String menuNameSnapshot, Long unitPriceSnapshot, int quantity) {
+		return new OrderItem(menuId, menuNameSnapshot, unitPriceSnapshot, quantity);
+	}
+
+	/**
+	 * 주문 항목을 생성합니다.
+	 *
+	 * <p>
+	 * 생성 규칙을 강제하기 위해 외부에서는 {@link #create(Long, String, Long, int)}를 사용합니다.
+	 * </p>
+	 */
+	private OrderItem(Long menuId, String menuNameSnapshot, Long unitPriceSnapshot, int quantity) {
 		this.menuId = menuId;
 		this.menuNameSnapshot = menuNameSnapshot;
 		this.unitPriceSnapshot = unitPriceSnapshot;
