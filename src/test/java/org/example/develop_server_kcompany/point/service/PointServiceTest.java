@@ -11,6 +11,7 @@ import org.example.develop_server_kcompany.point.dto.PointChargeRequest;
 import org.example.develop_server_kcompany.point.dto.PointChargeResponse;
 import org.example.develop_server_kcompany.point.repository.PointTransactionRepository;
 import org.example.develop_server_kcompany.point.repository.PointWalletRepository;
+import org.example.develop_server_kcompany.user.repository.UserRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -34,6 +35,9 @@ import org.springframework.transaction.support.TransactionTemplate;
 public class PointServiceTest {
 
 	@Mock
+	private UserRepository userRepository;
+
+	@Mock
 	private PointWalletRepository pointWalletRepository;
 
 	@Mock
@@ -46,8 +50,8 @@ public class PointServiceTest {
 	private PointService pointService;
 
 	@Test
-	@DisplayName("포인트 충전 성공 - 신규 지갑 생성 후 충전")
-	void charge_success_createWallet() {
+	@DisplayName("포인트 충전 성공 - 등록된 사용자 지갑 충전")
+	void charge_success_registeredUser_walletExists() {
 		// given
 		Long userId = 1L;
 		Long amount = 1000L;
@@ -56,6 +60,8 @@ public class PointServiceTest {
 		when(request.getUserId()).thenReturn(userId);
 		when(request.getAmount()).thenReturn(amount);
 		when(request.getIdempotencyKey()).thenReturn("test-key");
+
+		when(userRepository.existsById(userId)).thenReturn(true);
 
 		when(transactionTemplate.execute(any(TransactionCallback.class)))
 			.thenAnswer(invocation -> {
@@ -66,12 +72,9 @@ public class PointServiceTest {
 		when(pointTransactionRepository.findByUserIdAndIdempotencyKey(userId, "test-key"))
 			.thenReturn(Optional.empty());
 
-		when(pointWalletRepository.findById(userId))
-			.thenReturn(Optional.empty());
-
 		PointWallet wallet = new PointWallet(userId);
-		when(pointWalletRepository.save(any(PointWallet.class)))
-			.thenReturn(wallet);
+		when(pointWalletRepository.findById(userId))
+			.thenReturn(Optional.of(wallet));
 
 		when(pointTransactionRepository.save(any(PointTransaction.class)))
 			.thenAnswer(invocation -> invocation.getArgument(0));
@@ -86,7 +89,8 @@ public class PointServiceTest {
 		assertThat(response.getBalanceAfter()).isEqualTo(amount);
 
 		verify(pointTransactionRepository).findByUserIdAndIdempotencyKey(userId, "test-key");
-		verify(pointWalletRepository).save(any(PointWallet.class));
+		verify(userRepository).existsById(userId);
+		verify(pointWalletRepository, never()).save(any(PointWallet.class));
 		verify(pointTransactionRepository).save(any(PointTransaction.class));
 	}
 }
