@@ -26,7 +26,11 @@ public enum ErrorCode {
 	INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_SERVER_ERROR", "서버 오류가 발생했습니다."),
 
 	// 메뉴
-	MENU_NOT_FOUND(HttpStatus.NOT_FOUND, "MENU_NOT_FOUND", "메뉴를 찾을 수 없습니다.");
+	MENU_NOT_FOUND(HttpStatus.NOT_FOUND, "MENU_NOT_FOUND", "메뉴를 찾을 수 없습니다."),
+
+	//포인트
+	INVALID_AMOUNT(HttpStatus.BAD_REQUEST, "INVALID_AMOUNT", "충전/차감 금액은 양수만 입력 가능합니다."),
+	INSUFFICIENT_BALANCE(HttpStatus.CONFLICT, "INSuFFICIENT_BALANCE", "포인트 잔액이 부족합니다. 충전 후 재구매 해주세요.");
 
 	private final HttpStatus status;
 	private final String code;
