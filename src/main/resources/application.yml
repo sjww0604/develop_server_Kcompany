@@ -1,4 +1,6 @@
 spring:
+  profiles:
+    active: local
   datasource:
     url: jdbc:mysql://localhost:3306/kcompany?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul
     username: app
