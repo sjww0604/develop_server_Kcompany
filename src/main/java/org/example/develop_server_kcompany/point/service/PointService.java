@@ -9,6 +9,7 @@ import org.example.develop_server_kcompany.point.dto.PointChargeResponse;
 import org.example.develop_server_kcompany.point.enums.PointTransactionType;
 import org.example.develop_server_kcompany.point.repository.PointTransactionRepository;
 import org.example.develop_server_kcompany.point.repository.PointWalletRepository;
+import org.example.develop_server_kcompany.user.repository.UserRepository;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
@@ -33,6 +34,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class PointService {
 
+	private final UserRepository userRepository;
 	private final PointWalletRepository pointWalletRepository;
 	private final PointTransactionRepository pointTransactionRepository;
 	private final TransactionTemplate transactionTemplate;
@@ -55,8 +57,10 @@ public class PointService {
 							true, userId, tx.getAmount(), tx.getBalanceAfter(), idempotencyKey);
 					})
 					.orElseGet(() -> {
+						validateUserExists(userId);
+
 						PointWallet pointWallet = pointWalletRepository.findById(userId)
-							.orElseGet(() -> pointWalletRepository.save(new PointWallet(userId)));
+							.orElseThrow(() -> new CustomException(ErrorCode.WALLET_NOT_FOUND));
 
 						long balanceAfter = pointWallet.charge(amount);
 
@@ -89,7 +93,9 @@ public class PointService {
 			} catch (ObjectOptimisticLockingFailureException e) {
 				log.warn("[POINT] 낙관적 락 충돌 재시도. attempt={}, userId={}, key={}", attempt, userId, idempotencyKey);
 				if (attempt == 3) {
-					throw e;
+					log.error("[POINT] 포인트 충전 실패(낙관적 락 충돌). userId={}, amount={}, key={}, attempts={}",
+						userId, amount, idempotencyKey, attempt, e);
+					throw new CustomException(ErrorCode.CHARGE_FAIL);
 				}
 
 				long delayMs = 100L * (1L << (attempt - 1));
@@ -97,7 +103,8 @@ public class PointService {
 					Thread.sleep(delayMs);
 				} catch (InterruptedException ie) {
 					Thread.currentThread().interrupt();
-					throw new RuntimeException("BackOff 대기 중 인터럽트 발생", ie);
+					log.error("[POINT] BackOff 대기 중 인터럽트 발생. userId={}, key={}", userId, idempotencyKey, ie);
+					throw new CustomException(ErrorCode.CHARGE_FAIL);
 				}
 			}
 		}
@@ -109,11 +116,16 @@ public class PointService {
 			throw new CustomException(ErrorCode.INVALID_REQUEST);
 		}
 	}
-
 	private String normalizeIdempotencyKey(String idempotencyKey) {
 		if (idempotencyKey == null || idempotencyKey.isBlank()) {
 			return java.util.UUID.randomUUID().toString();
 		}
 		return idempotencyKey.trim();
+	}
+
+	private void validateUserExists(Long userId) {
+		if (!userRepository.existsById(userId)) {
+			throw new CustomException(ErrorCode.USER_NOT_FOUND);
+		}
 	}
 }

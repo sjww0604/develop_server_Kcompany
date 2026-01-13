@@ -25,10 +25,13 @@ public enum ErrorCode {
 	INVALID_REQUEST(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "잘못된 요청입니다."),
 	INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_SERVER_ERROR", "서버 오류가 발생했습니다."),
 
+	// 사용자
+	USER_NOT_FOUND(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "유저를 조회할 수 없습니다."),
 	// 메뉴
 	MENU_NOT_FOUND(HttpStatus.NOT_FOUND, "MENU_NOT_FOUND", "메뉴를 찾을 수 없습니다."),
 
 	//포인트
+	WALLET_NOT_FOUND(HttpStatus.NOT_FOUND, "WALLET_NOT_FOUND", "지갑 정보를 조회할 수 없습니다.(오류)"),
 	CHARGE_FAIL(HttpStatus.EXPECTATION_FAILED, "CHARGE_FAIL", "포인트 충전 요청이 실패했습니다."),
 	INVALID_AMOUNT(HttpStatus.BAD_REQUEST, "INVALID_AMOUNT", "충전/차감 금액은 양수만 입력 가능합니다."),
 	BALANCE_OVERFLOW(HttpStatus.BAD_REQUEST, "BALANCE_OVERFLOW", "최대 보유 가능 포인트를 초과합니다."),
