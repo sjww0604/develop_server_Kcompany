@@ -48,21 +48,4 @@ public class GlobalExceptionHandler {
 			.status(ErrorCode.INVALID_REQUEST.getStatus())
 			.body(ApiErrorResponse.from(ErrorCode.INVALID_REQUEST));
 	}
-
-	/**
-	 * 그 외 처리되지 않은 모든 예외를 처리합니다.
-	 * <p>
-	 * 예상하지 못한 예외는 서버 내부 오류(500)로 응답하며, 원인 파악을 위해 로그를 남깁니다.
-	 * </p>
-	 *
-	 * @param e 처리되지 않은 예외
-	 * @return 500(INTERNAL_SERVER_ERROR) 에러 응답
-	 */
-	@ExceptionHandler(Exception.class)
-	public ResponseEntity<ApiErrorResponse> handleException(Exception e) {
-		log.error("[정의한 예외처리 외의 실패 케이스 발생]", e);
-		return ResponseEntity
-			.status(ErrorCode.INTERNAL_SERVER_ERROR.getStatus())
-			.body(ApiErrorResponse.from(ErrorCode.INTERNAL_SERVER_ERROR));
-	}
 }
