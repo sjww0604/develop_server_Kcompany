@@ -11,6 +11,10 @@ import org.example.develop_server_kcompany.payment.enums.OrderStatus;
 import org.example.develop_server_kcompany.payment.repository.OrderRepository;
 import org.example.develop_server_kcompany.point.service.PointService;
 import org.example.develop_server_kcompany.point.service.PointService.SpendResult;
+import org.example.develop_server_kcompany.common.exception.CustomException;
+import org.example.develop_server_kcompany.common.exception.ErrorCode;
+import org.example.develop_server_kcompany.menu.domain.Menu;
+import org.example.develop_server_kcompany.menu.repository.MenuRepository;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -44,6 +48,7 @@ public class OrderService {
 
 	private final OrderRepository orderRepository;
 	private final PointService pointService;
+	private final MenuRepository menuRepository;
 
 	@Transactional
 	public CreateOrderResult createOrder(Long userId, String idempotencyKey, List<CreateOrderItemCommand> items) {
@@ -60,8 +65,24 @@ public class OrderService {
 		Order order = Order.create(userId, normalizedKey);
 		for (CreateOrderItemCommand item : items) {
 			validateCreateOrderItem(item);
+
+			Menu menu = menuRepository.findById(item.menuId())
+				.orElseThrow(() -> new CustomException(ErrorCode.MENU_NOT_FOUND));
+			if (!menu.isActive()) {
+				throw new CustomException(ErrorCode.MENU_NOT_FOUND);
+			}
+
+			Long unitPriceSnapshot;
+			if (menu.getPrice() == null)
+				unitPriceSnapshot = null;
+			else
+				unitPriceSnapshot = menu.getPrice().longValue();
+			if (unitPriceSnapshot == null || unitPriceSnapshot <= 0) {
+				throw new CustomException(ErrorCode.MENU_NOT_FOUND);
+			}
+
 			order.addItem(
-				OrderItem.create(item.menuId(), item.menuNameSnapshot(), item.unitPriceSnapshot(), item.quantity())
+				OrderItem.create(menu.getId(), menu.getName(), unitPriceSnapshot, item.quantity())
 			);
 		}
 
@@ -81,7 +102,7 @@ public class OrderService {
 			return resumeIfNeeded(conflictOrder, userId, normalizedKey, true);
 		}
 
-		SpendResult spendResult = pointService.spend(userId, totalAmount, normalizedKey);
+		SpendResult spendResult = pointService.spend(userId, totalAmount, normalizedKey, saved.getId());
 		saved.markPaid();
 
 		return CreateOrderResult.from(saved, spendResult, false);
@@ -95,7 +116,7 @@ public class OrderService {
 			throw new IllegalStateException("주문 totalAmount가 유효하지 않습니다. orderId: " + order.getId());
 		}
 
-		SpendResult spendResult = pointService.spend(userId, totalAmount, normalizedKey);
+		SpendResult spendResult = pointService.spend(userId, totalAmount, normalizedKey, order.getId());
 
 		if (order.getStatus() == OrderStatus.CREATED) {
 			order.markPaid();
@@ -122,15 +143,8 @@ public class OrderService {
 			throw new IllegalArgumentException("최소 1개 이상의 상품이 담겨야 합니다.");
 		}
 
-		// 아래 값들은 "주문 금액 계산"과 "스냅샷 저장"의 정합성을 위한 비즈니스 검증입니다.
 		if (item.menuId() == null || item.menuId() <= 0) {
 			throw new IllegalArgumentException("등록된 상품 식별자만 주문 생성이 가능합니다.");
-		}
-		if (item.menuNameSnapshot() == null || item.menuNameSnapshot().isBlank()) {
-			throw new IllegalArgumentException("등록된 상품명만 주문 생성이 가능합니다.");
-		}
-		if (item.unitPriceSnapshot() == null || item.unitPriceSnapshot() <= 0) {
-			throw new IllegalArgumentException("상품 가격은 양수여야 합니다.");
 		}
 		if (item.quantity() <= 0) {
 			throw new IllegalArgumentException("주문 수량은 1 이상이어야 합니다.");
@@ -140,7 +154,7 @@ public class OrderService {
 	/**
 	 * 컨트롤러(Request DTO)와 분리된, 서비스 내부 입력 커맨드입니다.
 	 */
-	public record CreateOrderItemCommand(Long menuId, String menuNameSnapshot, Long unitPriceSnapshot, int quantity) {
+	public record CreateOrderItemCommand(Long menuId, int quantity) {
 	}
 
 	/**
@@ -169,7 +183,7 @@ public class OrderService {
 				itemResults,
 				spendResult.idempotencyKey(),
 				duplicate,
-				order.getCreatedTime()
+				order.getCreatedAt()
 			);
 		}
 	}

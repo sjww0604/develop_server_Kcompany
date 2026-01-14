@@ -117,23 +117,19 @@ public class PointService {
 	}
 
 	/**
-	 * 주문 등 외부 유스케이스에서 포인트를 "사용(차감)" 처리하는 메서드입니다.
+	 * 포인트를 사용(차감) 처리합니다.
 	 * <p>
-	 * 멱등성 키(idempotencyKey)를 기준으로 중복 차감을 방지하며,
-	 * 지갑 잔액 갱신 + 거래 이력 기록을 하나의 트랜잭션으로 처리합니다.
+	 * 주문 결제 흐름에서 사용하며, 차감 원장(point_transactions)에 {@code orderId}를 함께 저장합니다.
+	 * 멱등성 키 기준으로 중복 차감을 방지합니다.
 	 * </p>
 	 *
-	 * <p>
-	 * 멱등성 키는 optional-or-empty가 가능하므로, 비어 있는 경우에는 서버에서 UUID를 생성하여 사용합니다.
-	 * (단, 응답을 못 받은 실패/타임아웃 상황에서는 동일 키를 재전달할 수 없어 완전한 멱등 재시도는 제한됩니다.)
-	 * </p>
-	 *
-	 * @param userId         사용자 식별자
-	 * @param amount         차감할 금액(양수)
+	 * @param userId 사용자 식별자
+	 * @param amount 차감 금액(양수)
 	 * @param idempotencyKey 멱등성 키(선택)
+	 * @param orderId 주문 식별자(주문 결제 시 전달, 그 외 null 가능)
 	 * @return 차감 처리 결과(중복 여부, 잔액, 최종 멱등성 키)
 	 */
-	public SpendResult spend(Long userId, long amount, String idempotencyKey) {
+	public SpendResult spend(Long userId, long amount, String idempotencyKey, Long orderId) {
 		validateSpendUseCase(userId, amount);
 
 		String normalizedKey = normalizeIdempotencyKey(idempotencyKey);
@@ -160,7 +156,7 @@ public class PointService {
 							PointTransactionType.SPEND,
 							amount,
 							balanceAfter,
-							null,
+							orderId,
 							normalizedKey
 						);
 
@@ -180,8 +176,8 @@ public class PointService {
 								.orElseThrow(() -> e);
 						}
 
-						log.info("[POINT] 포인트 사용(차감) 성공. userId={}, amount={}, balanceAfter={}, key={}",
-							userId, amount, balanceAfter, normalizedKey);
+						log.info("[POINT] 포인트 사용(차감) 성공. userId={}, amount={}, balanceAfter={}, key={}, orderId={}",
+							userId, amount, balanceAfter, normalizedKey, orderId);
 						return SpendResult.of(false, balanceAfter, normalizedKey);
 					}));
 
