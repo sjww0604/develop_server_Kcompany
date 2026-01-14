@@ -8,6 +8,7 @@ import java.util.stream.Collectors;
 import org.example.develop_server_kcompany.payment.domain.Order;
 import org.example.develop_server_kcompany.payment.domain.OrderItem;
 import org.example.develop_server_kcompany.payment.enums.OrderStatus;
+import org.example.develop_server_kcompany.payment.event.OrderCompletedDomainEvent;
 import org.example.develop_server_kcompany.payment.repository.OrderRepository;
 import org.example.develop_server_kcompany.point.service.PointService;
 import org.example.develop_server_kcompany.point.service.PointService.SpendResult;
@@ -15,6 +16,7 @@ import org.example.develop_server_kcompany.common.exception.CustomException;
 import org.example.develop_server_kcompany.common.exception.ErrorCode;
 import org.example.develop_server_kcompany.menu.domain.Menu;
 import org.example.develop_server_kcompany.menu.repository.MenuRepository;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -49,6 +51,7 @@ public class OrderService {
 	private final OrderRepository orderRepository;
 	private final PointService pointService;
 	private final MenuRepository menuRepository;
+	private final ApplicationEventPublisher eventPublisher;
 
 	@Transactional
 	public CreateOrderResult createOrder(Long userId, String idempotencyKey, List<CreateOrderItemCommand> items) {
@@ -104,6 +107,7 @@ public class OrderService {
 
 		SpendResult spendResult = pointService.spend(userId, totalAmount, normalizedKey, saved.getId());
 		saved.markPaid();
+		eventPublisher.publishEvent(new OrderCompletedDomainEvent(saved.getId()));
 
 		return CreateOrderResult.from(saved, spendResult, false);
 	}
@@ -120,6 +124,7 @@ public class OrderService {
 
 		if (order.getStatus() == OrderStatus.CREATED) {
 			order.markPaid();
+			eventPublisher.publishEvent(new OrderCompletedDomainEvent(order.getId()));
 		}
 
 		return CreateOrderResult.from(order, spendResult, requestDuplicate || spendResult.duplicate());
