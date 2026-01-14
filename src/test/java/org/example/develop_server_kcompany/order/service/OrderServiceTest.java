@@ -25,6 +25,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.context.ActiveProfiles;
 
@@ -49,6 +50,8 @@ public class OrderServiceTest {
 	PointService pointService;
 	@Mock
 	MenuRepository menuRepository;
+	@Mock
+	ApplicationEventPublisher eventPublisher;
 
 	@InjectMocks
 	OrderService orderService;
