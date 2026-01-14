@@ -1,13 +1,16 @@
 package org.example.develop_server_kcompany.payment.service;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import org.example.develop_server_kcompany.payment.domain.Order;
 import org.example.develop_server_kcompany.payment.domain.OrderItem;
 import org.example.develop_server_kcompany.payment.enums.OrderStatus;
 import org.example.develop_server_kcompany.payment.repository.OrderRepository;
 import org.example.develop_server_kcompany.point.service.PointService;
+import org.example.develop_server_kcompany.point.service.PointService.SpendResult;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -51,7 +54,7 @@ public class OrderService {
 		Optional<Order> existing = orderRepository.findByUserIdAndIdempotencyKey(userId, normalizedKey);
 		if (existing.isPresent()) {
 			Order existingOrder = existing.get();
-			return resumeIfNeeded(existingOrder, userId, normalizedKey);
+			return resumeIfNeeded(existingOrder, userId, normalizedKey, true);
 		}
 
 		Order order = Order.create(userId, normalizedKey);
@@ -75,35 +78,31 @@ public class OrderService {
 			Order conflictOrder = orderRepository.findByUserIdAndIdempotencyKey(userId, normalizedKey)
 				.orElseThrow(() -> e);
 
-			return resumeIfNeeded(conflictOrder, userId, normalizedKey);
+			return resumeIfNeeded(conflictOrder, userId, normalizedKey, true);
 		}
 
-		pointService.spend(userId, totalAmount, normalizedKey);
-		if (saved.getStatus() == OrderStatus.CREATED) {
-			saved.markPaid();
-		}
+		SpendResult spendResult = pointService.spend(userId, totalAmount, normalizedKey);
+		saved.markPaid();
 
-		return CreateOrderResult.from(saved);
+		return CreateOrderResult.from(saved, spendResult, false);
 	}
 
-	private CreateOrderResult resumeIfNeeded(Order order, Long userId, String normalizedKey) {
-		if (order.getStatus() == OrderStatus.PAID) {
-			return CreateOrderResult.from(order);
-		}
+	private CreateOrderResult resumeIfNeeded(
+		Order order, Long userId, String normalizedKey, boolean requestDuplicate) {
 
 		long totalAmount = order.getTotalAmount();
 		if (totalAmount <= 0) {
-			throw new IllegalStateException("CREATED 주문의 totalAmount가 유효하지 않습니다. orderId: " + order.getId());
+			throw new IllegalStateException("주문 totalAmount가 유효하지 않습니다. orderId: " + order.getId());
 		}
 
-		pointService.spend(userId, totalAmount, normalizedKey);
+		SpendResult spendResult = pointService.spend(userId, totalAmount, normalizedKey);
+
 		if (order.getStatus() == OrderStatus.CREATED) {
 			order.markPaid();
 		}
 
-		return CreateOrderResult.from(order);
+		return CreateOrderResult.from(order, spendResult, requestDuplicate || spendResult.duplicate());
 	}
-
 
 	private void validateCreateOrderRequest(List<CreateOrderItemCommand> items) {
 		if (items == null || items.isEmpty()) {
@@ -134,7 +133,7 @@ public class OrderService {
 			throw new IllegalArgumentException("상품 가격은 양수여야 합니다.");
 		}
 		if (item.quantity() <= 0) {
-			throw new IllegalArgumentException("재고 수량은 1 이상이어야 합니다.");
+			throw new IllegalArgumentException("주문 수량은 1 이상이어야 합니다.");
 		}
 	}
 
@@ -147,13 +146,48 @@ public class OrderService {
 	/**
 	 * 주문 생성 결과(서비스 반환 값)입니다.
 	 */
-	public record CreateOrderResult(Long orderId, String status, long totalAmount, String idempotencyKey) {
-		public static CreateOrderResult from(Order order) {
+	public record CreateOrderResult(
+		Long orderId,
+		Long userId,
+		long totalAmount,
+		long balanceAfter,
+		List<CreateOrderItemResult> items,
+		String idempotencyKey,
+		boolean duplicate,
+		LocalDateTime createdAt
+	) {
+		public static CreateOrderResult from(Order order, SpendResult spendResult, boolean duplicate) {
+			List<CreateOrderItemResult> itemResults = order.getItems().stream()
+				.map(CreateOrderItemResult::from)
+				.collect(Collectors.toList());
+
 			return new CreateOrderResult(
 				order.getId(),
-				order.getStatus().name(),
+				order.getUserId(),
 				order.getTotalAmount(),
-				order.getIdempotencyKey()
+				spendResult.balanceAfter(),
+				itemResults,
+				spendResult.idempotencyKey(),
+				duplicate,
+				order.getCreatedTime()
+			);
+		}
+	}
+
+	public record CreateOrderItemResult(
+		Long menuId,
+		String menuName,
+		Long unitPrice,
+		int quantity,
+		long lineAmount
+	) {
+		public static CreateOrderItemResult from(OrderItem item) {
+			return new CreateOrderItemResult(
+				item.getMenuId(),
+				item.getMenuNameSnapshot(),
+				item.getUnitPriceSnapshot(),
+				item.getQuantity(),
+				item.getLineAmount()
 			);
 		}
 	}
