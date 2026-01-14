@@ -1,4 +1,6 @@
 spring:
+  profiles:
+    active: local
   datasource:
     url: jdbc:mysql://localhost:3306/kcompany?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul
     username: app
@@ -19,3 +21,8 @@ spring:
       host: localhost
   kafka:
     bootstrap-servers: localhost:9092,localhost:9093,localhost:9094
+
+app:
+  kafka:
+    topic:
+      payment: payment.completed.v1
